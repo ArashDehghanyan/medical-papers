@@ -101,17 +101,12 @@ class Resnet(Model):
     def __init__(self, arch, num_classes):
         super(Resnet, self).__init__()
         self.net = Sequential(self.block0())
-        
+        self.num_classes = num_classes
         for i, b in enumerate(arch):
-            self.net.add(self.cfg_block(*b, first_block=(i == 0)))
+            self.net.add(self.body(*b, first_block=(i == 0)))
             
         # add classifier to the model
-        self.net.add(Sequential([
-            AveragePooling2D(pool_size=2, padding='same'),
-            Dropout(0.2),
-            Flatten(),
-            Dense(num_classes, activation='softmax')
-        ]))
+        self.net.add(self.classifier())
         
     def call(self, inputs, training=None, mask=None):
         return self.net(inputs)
@@ -125,7 +120,7 @@ class Resnet(Model):
             MaxPooling2D(pool_size=3, padding='same', strides=2)
         ])
 
-    def cfg_block(self, num_residuals, num_channels, first_block=False):
+    def body(self, num_residuals, num_channels, first_block=False):
         """create residual blocks using bottleneck building blocks"""
         cfg = Sequential()
         for j in range(num_residuals):
@@ -136,6 +131,14 @@ class Resnet(Model):
             else:
                 cfg.add(Bottleneck(num_channels))
         return cfg
+
+    def classifier(self):
+        return Sequential([
+            AveragePooling2D(pool_size=2, padding='same'),
+            Dropout(0.2),
+            Flatten(),
+            Dense(self.num_classes, activation='softmax')
+        ])
 
 
 class ResNet18(ResNet, ABC):
