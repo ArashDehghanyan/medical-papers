@@ -3,12 +3,13 @@ from abc import ABC
 import tensorflow as tf
 from tensorflow import keras
 from keras.models import Model, Sequential
+from keras.layers import Layer
 from keras.layers import Conv2D, BatchNormalization, Activation, MaxPooling2D, GlobalAveragePooling2D
 from keras.layers import AveragePooling2D, Flatten, Dropout, Dense
 from keras.activations import relu
 
 
-class Residual(Model):
+class Residual(Layer):
     """The Residual block of ResNet."""
 
     def __init__(self, num_channels, use1x1conv=False, strides=1):
@@ -33,7 +34,7 @@ class Residual(Model):
         return relu(y)
 
 
-class Bottleneck(keras.layers.Layer):
+class Bottleneck(Layer):
     """bottleneck block for resnet50/101/152"""
 
     def __init__(self, num_channels, use_projection_shortcut=False, strides=1):
@@ -95,11 +96,11 @@ class ResNet(Model, ABC):
         return y
 
 
-class Resnet(Model):
+class DeepResNet(Model):
     """Deeper Resnet model for 50 layers and more"""
 
     def __init__(self, arch, num_classes):
-        super(Resnet, self).__init__()
+        super(DeepResNet, self).__init__()
         self.num_classes = num_classes
 
         self.net = Sequential()
@@ -146,7 +147,7 @@ class ResNet18(ResNet, ABC):
                          lr, num_classes)
 
 
-class Resnet50(Resnet):
+class Resnet50(DeepResNet):
     """Create Resnet-50 using bottleneck building blocks"""
     
     def __init__(self, num_classes=2):
