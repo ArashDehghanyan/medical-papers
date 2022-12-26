@@ -33,7 +33,7 @@ class Residual(Model):
         return relu(y)
 
 
-class Bottleneck(Model):
+class Bottleneck(keras.layers.Layer):
     """bottleneck block for resnet50/101/152"""
 
     def __init__(self, num_channels, use_projection_shortcut=False, strides=1):
@@ -100,45 +100,39 @@ class Resnet(Model):
 
     def __init__(self, arch, num_classes):
         super(Resnet, self).__init__()
-        self.net = Sequential(self.block0())
         self.num_classes = num_classes
+
+        self.net = Sequential()
+        self.block0()
         for i, b in enumerate(arch):
-            self.net.add(self.body(*b, first_block=(i == 0)))
+            self.body(*b, first_block=(i == 0))
             
         # add classifier to the model
-        self.net.add(self.classifier())
+        self.classifier()
         
     def call(self, inputs, training=None, mask=None):
         return self.net(inputs)
 
     def block0(self):
         """create first block"""
-        return Sequential([
-            Conv2D(filters=64, kernel_size=7, padding='same', strides=2),
-            BatchNormalization(),
-            Activation('relu'),
-            MaxPooling2D(pool_size=3, padding='same', strides=2)
-        ])
+        self.net.add(Conv2D(filters=64, kernel_size=7, padding='same', strides=2, input_shape=(224, 224, 3)))
+        self.net.add(BatchNormalization())
+        self.net.add(Activation('relu'))
+        self.net.add(MaxPooling2D(pool_size=3, padding='same', strides=2))
 
     def body(self, num_residuals, num_channels, first_block=False):
         """create residual blocks using bottleneck building blocks"""
-        cfg = Sequential()
         for j in range(num_residuals):
             if j == 0 and not first_block:
-                cfg.add(Bottleneck(num_channels, use_projection_shortcut=True, strides=2))
+                self.net.add(Bottleneck(num_channels, use_projection_shortcut=True, strides=2))
             elif j == 0 and first_block:
-                cfg.add(Bottleneck(num_channels, use_projection_shortcut=True))
+                self.net.add(Bottleneck(num_channels, use_projection_shortcut=True))
             else:
-                cfg.add(Bottleneck(num_channels))
-        return cfg
+                self.net.add(Bottleneck(num_channels))
 
     def classifier(self):
-        return Sequential([
-            AveragePooling2D(pool_size=2, padding='same'),
-            Dropout(0.2),
-            Flatten(),
-            Dense(self.num_classes, activation='softmax')
-        ])
+        self.net.add(GlobalAveragePooling2D())
+        self.net.add(Dense(self.num_classes, activation='softmax'))
 
 
 class ResNet18(ResNet, ABC):
