@@ -96,45 +96,70 @@ class ResNet(Model, ABC):
         return y
 
 
+class FirstLayer(Layer):
+    """GoogleNet and ResNet first layers"""
+    def __init__(self):
+        super(FirstLayer, self).__init__()
+        self.conv = Conv2D(64, kernel_size=7, padding='same', strides=2, input_shape=(224, 224, 3))
+        self.bn = BatchNormalization()
+        self.max_pool = MaxPooling2D(pool_size=3, padding='same', strides=2)
+
+    def call(self, inputs, *args, **kwargs):
+        y = self.bn(self.conv(inputs))
+        return self.max_pool(y)
+
+
+class Classifier(Layer):
+    """Classifier layer"""
+    def __init__(self, num_classes, activation=None, dropout_rate=0.1):
+        super(Classifier, self).__init__()
+        self.global_pool = GlobalAveragePooling2D()
+        self.dropout = Dropout(dropout_rate)
+        self.fc = Dense(num_classes, activation=activation)
+
+    def call(self, inputs, *args, **kwargs):
+        x = self.global_pool(inputs)
+        x = self.dropout(x)
+        y = self.fc(x)
+        return y
+
+
+class ResnetModule(Layer):
+    """Create deep residual modules"""
+    def __init__(self, num_residuals, num_channels, first_block=False):
+        super(ResnetModule, self).__init__()
+        self.module = []
+        for j in range(num_residuals):
+            if j == 0 and not first_block:
+                self.module.append(Bottleneck(num_channels, use_projection_shortcut=True, strides=2))
+            elif j == 0 and first_block:
+                self.module.append(Bottleneck(num_channels, use_projection_shortcut=True))
+            else:
+                self.module.append(Bottleneck(num_channels))
+
+    def call(self, x, *args, **kwargs):
+        for b in self.module:
+            x = b(x)
+        return x
+
+
 class DeepResNet(Model):
     """Deeper Resnet model for 50 layers and more"""
 
-    def __init__(self, arch, num_classes, dropout_rate=0.2):
+    def __init__(self, arch, num_classes, dropout_rate):
         super(DeepResNet, self).__init__()
-        self.num_classes = num_classes
+        self.first_layer = FirstLayer()
+        self.classifier = Classifier(num_classes=num_classes, activation='softmax', dropout_rate=dropout_rate)
+        self.modules = []
 
-        self.net = Sequential()
-        self.block0()
         for i, b in enumerate(arch):
-            self.body(*b, first_block=(i == 0))
-            
-        # add classifier to the model
-        self.classifier(dropout_rate)
+            self.modules.append(ResnetModule(*b, first_block=(i == 0)))
         
     def call(self, inputs, training=None, mask=None):
-        return self.net(inputs)
-
-    def block0(self):
-        """create first block"""
-        self.net.add(Conv2D(filters=64, kernel_size=7, padding='same', strides=2, input_shape=(224, 224, 3)))
-        self.net.add(BatchNormalization())
-        self.net.add(Activation('relu'))
-        self.net.add(MaxPooling2D(pool_size=3, padding='same', strides=2))
-
-    def body(self, num_residuals, num_channels, first_block=False):
-        """create residual blocks using bottleneck building blocks"""
-        for j in range(num_residuals):
-            if j == 0 and not first_block:
-                self.net.add(Bottleneck(num_channels, use_projection_shortcut=True, strides=2))
-            elif j == 0 and first_block:
-                self.net.add(Bottleneck(num_channels, use_projection_shortcut=True))
-            else:
-                self.net.add(Bottleneck(num_channels))
-
-    def classifier(self, d_rate):
-        self.net.add(GlobalAveragePooling2D())
-        self.net.add(Dropout(d_rate))
-        self.net.add(Dense(self.num_classes, activation='softmax'))
+        x = self.first_layer(inputs)
+        for m in self.modules:
+            x = m(x)
+        return self.classifier(x)
 
 
 class ResNet18(ResNet, ABC):

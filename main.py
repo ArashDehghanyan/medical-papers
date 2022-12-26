@@ -7,7 +7,9 @@ from resnet import *
 if __name__ == '__main__':
 
     resnet50 = Resnet50(1000, dropout_rate=0.5)
-    resnet50.net.summary()
+    X = tf.random.normal((1, 224, 224, 3))
+    y = resnet50(X)
+    resnet50.summary()
 
 
 
