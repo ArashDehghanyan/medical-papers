@@ -133,6 +133,7 @@ class DeepResNet(Model):
 
     def classifier(self):
         self.net.add(GlobalAveragePooling2D())
+        self.net.add(Dropout(0.2))
         self.net.add(Dense(self.num_classes, activation='softmax'))
 
 
