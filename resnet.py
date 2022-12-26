@@ -99,7 +99,7 @@ class ResNet(Model, ABC):
 class DeepResNet(Model):
     """Deeper Resnet model for 50 layers and more"""
 
-    def __init__(self, arch, num_classes):
+    def __init__(self, arch, num_classes, dropout_rate=0.2):
         super(DeepResNet, self).__init__()
         self.num_classes = num_classes
 
@@ -109,7 +109,7 @@ class DeepResNet(Model):
             self.body(*b, first_block=(i == 0))
             
         # add classifier to the model
-        self.classifier()
+        self.classifier(dropout_rate)
         
     def call(self, inputs, training=None, mask=None):
         return self.net(inputs)
@@ -131,9 +131,9 @@ class DeepResNet(Model):
             else:
                 self.net.add(Bottleneck(num_channels))
 
-    def classifier(self):
+    def classifier(self, d_rate):
         self.net.add(GlobalAveragePooling2D())
-        self.net.add(Dropout(0.2))
+        self.net.add(Dropout(d_rate))
         self.net.add(Dense(self.num_classes, activation='softmax'))
 
 
@@ -151,5 +151,6 @@ class ResNet18(ResNet, ABC):
 class Resnet50(DeepResNet):
     """Create Resnet-50 using bottleneck building blocks"""
     
-    def __init__(self, num_classes=2):
-        super(Resnet50, self).__init__(((3, 64), (4, 128), (6, 256), (3, 512)), num_classes=num_classes)
+    def __init__(self, num_classes=2, dropout_rate=0.2):
+        super(Resnet50, self).__init__(((3, 64), (4, 128), (6, 256), (3, 512)),
+                                       num_classes=num_classes, dropout_rate=dropout_rate)
